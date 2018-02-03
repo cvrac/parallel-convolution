@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
 	MPI_Bcast(&columns, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 	MPI_Bcast(&best_fit_rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 
-  // Find process row and column offsets
+	// Find process row and column offsets
 	int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
 	int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
@@ -122,8 +122,3 @@ int main(int argc, char **argv) {
 	MPI_Finalize();
 	return 0;
 }
-
-
-
-
-
