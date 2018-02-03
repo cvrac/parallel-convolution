@@ -16,15 +16,15 @@ unsigned int best_fit(int rows, int cols, int processes) {
 	for (rows_it = 1; rows_it != processes + 1; rows_it++) {
 		if (processes % rows_it || rows % rows_it)
 			continue;
-    cols_it = processes / rows_it;
-    if (cols % cols_it) continue;
-      current = rows / rows_it + cols / cols_it;
-    if (current < min) {
+		cols_it = processes / rows_it;
+		if (cols % cols_it) continue;
+		current = rows / rows_it + cols / cols_it;
+		if (current < min) {
 			min = current;
 			best_fit_val = rows_it;
-    }
+		}
 	}
-  return best_fit_val;
+	return best_fit_val;
 }
 
 int main(int argc, char **argv) {
@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 	int width = 0, height = 0;
 	int loops = 0, grey = 0;
 	char *picture = NULL;
-  int rows = 0, columns = 0;
+	int rows = 0, columns = 0;
 
 	MPI_Init(&argc, &argv);
 
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
 
 	// Variables setup
-  int best_fit_rows;
+	int best_fit_rows;
 	if (comm_rk == MASTER_PROCESS) {
 		width = atoi(argv[1]); height = atoi(argv[2]);
 		loops = atoi(argv[3]);
@@ -68,17 +68,16 @@ int main(int argc, char **argv) {
 			grey = 1;
 
 		printf("I am the master process\n");
-    best_fit_rows = best_fit(height, width, comm_sz);
-    if (!best_fit_rows) {
-        MPI_Abort(cartesianComm, 1);
-        return 1;
-    }
-    printf("%d\n", best_fit_rows);
-    rows = height / best_fit_rows;
-    columns = width / (comm_sz / best_fit_rows);
-    printf("%d %d\n", rows, columns);
+		best_fit_rows = best_fit(height, width, comm_sz);
+		if (!best_fit_rows) {
+			MPI_Abort(cartesianComm, 1);
+			return 1;
+		}
+		printf("%d\n", best_fit_rows);
+		rows = height / best_fit_rows;
+		columns = width / (comm_sz / best_fit_rows);
+		printf("%d %d\n", rows, columns);
 	}
-
 
 	picture = malloc((strlen(argv[5]) +1) * sizeof(char));
 	assert( picture != NULL);
@@ -88,13 +87,13 @@ int main(int argc, char **argv) {
 	MPI_Bcast(&height, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 	MPI_Bcast(&loops, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 	MPI_Bcast(&grey, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-  MPI_Bcast(&rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-  MPI_Bcast(&columns, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-  MPI_Bcast(&best_fit_rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+	MPI_Bcast(&rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+	MPI_Bcast(&columns, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+	MPI_Bcast(&best_fit_rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 
   // Find process row and column offsets
-  int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
-  int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
+	int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
+	int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
 	printf("I am the process %d %d, %d, %d, %d, %s with starting row index = %d and starting column index = %d\n", comm_rk, width, height, loops, grey, picture, row_index, column_index);
 	// Initialize Convolution Filter
