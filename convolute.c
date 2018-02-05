@@ -15,99 +15,99 @@
  * 2. Convolution filter definition
  * 3. Parallel read of the input file "image"
  *
-*/
+ */
 
 
 
 unsigned int best_fit(int rows, int cols, int processes) {
-	unsigned int rows_it, cols_it, best_fit_val = 0, min = rows + cols + 1;
-	unsigned int current;
+    unsigned int rows_it, cols_it, best_fit_val = 0, min = rows + cols + 1;
+    unsigned int current;
 
-	for (rows_it = 1; rows_it != processes + 1; rows_it++) {
-		if (processes % rows_it || rows % rows_it)
-			continue;
-		cols_it = processes / rows_it;
-		if (cols % cols_it) continue;
-		current = rows / rows_it + cols / cols_it;
-		if (current < min) {
-			min = current;
-			best_fit_val = rows_it;
-		}
-	}
-	return best_fit_val;
+    for (rows_it = 1; rows_it != processes + 1; rows_it++) {
+        if (processes % rows_it || rows % rows_it)
+            continue;
+        cols_it = processes / rows_it;
+        if (cols % cols_it) continue;
+        current = rows / rows_it + cols / cols_it;
+        if (current < min) {
+            min = current;
+            best_fit_val = rows_it;
+        }
+    }
+    return best_fit_val;
 }
 
 int main(int argc, char **argv) {
-	int comm_sz = 0, comm_rk = 0;
-	int width = 0, height = 0;
-	int loops = 0, grey = 0;
-	char *picture = NULL;
+    int comm_sz = 0, comm_rk = 0;
+    int width = 0, height = 0;
+    int loops = 0, grey = 0;
+    char *picture = NULL;
     int rows = 0, columns = 0;
     int proc_row = -1, proc_col = -1;
     int i = 0;
 
-	MPI_Init(&argc, &argv);
+    MPI_Init(&argc, &argv);
 
-	MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
-	MPI_Comm_rank(MPI_COMM_WORLD, &comm_rk);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+    MPI_Comm_rank(MPI_COMM_WORLD, &comm_rk);
 
-	MPI_Request se_nr_request;
-	MPI_Request se_ea_request;
-	MPI_Request se_so_request;
-	MPI_Request se_we_request;
-	MPI_Request rcv_nr_request;
-	MPI_Request rcv_ea_request;
-	MPI_Request rcv_so_request;	
-	MPI_Request rcv_we_request;	
+    MPI_Request se_nr_request;
+    MPI_Request se_ea_request;
+    MPI_Request se_so_request;
+    MPI_Request se_we_request;
+    MPI_Request rcv_nr_request;
+    MPI_Request rcv_ea_request;
+    MPI_Request rcv_so_request;	
+    MPI_Request rcv_we_request;	
     MPI_Status status;
-	
-
-	MPI_Datatype send_col, send_row;
-
-	// Cartesian topology definition
-	MPI_Comm cartesianComm;
-	int dims[DIMENSIONALITY] = {0, 0};
-	int periods[2] = {0, 0};
-	int reorder = 1;
-	MPI_Dims_create(comm_sz, DIMENSIONALITY, dims);
-	MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
-
-	// Variables setup
-	int best_fit_rows;
-	if (comm_rk == MASTER_PROCESS) {
-		width = atoi(argv[1]); height = atoi(argv[2]);
-		loops = atoi(argv[3]);
-		printf("MASTER SAYS %d\n", height);
-		if (!strcmp(argv[4], "grey"))
-			grey = 1;
-
-		printf("I am the master process\n");
-		best_fit_rows = best_fit(height, width, comm_sz);
-		if (!best_fit_rows) {
-			MPI_Abort(cartesianComm, 1);
-			return 1;
-		}
-		printf("%d\n", best_fit_rows);
-		rows = height / best_fit_rows;
-		columns = width / (comm_sz / best_fit_rows);
-		printf("%d %d\n", rows, columns);
-	}
 
 
-	picture = calloc((strlen(argv[5]) +1), sizeof(char));
-	assert( picture != NULL);
-	strncpy(picture, argv[5], strlen(argv[5]) + 1);
+    MPI_Datatype send_col, send_row;
 
-	MPI_Bcast(&width, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&height, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&loops, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&grey, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&columns, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
-	MPI_Bcast(&best_fit_rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    // Cartesian topology definition
+    MPI_Comm cartesianComm;
+    int dims[DIMENSIONALITY] = {0, 0};
+    int periods[2] = {0, 0};
+    int reorder = 1;
+    MPI_Dims_create(comm_sz, DIMENSIONALITY, dims);
+    MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
+
+    // Variables setup
+    int best_fit_rows;
+    if (comm_rk == MASTER_PROCESS) {
+        width = atoi(argv[1]); height = atoi(argv[2]);
+        loops = atoi(argv[3]);
+        printf("MASTER SAYS %d\n", height);
+        if (!strcmp(argv[4], "grey"))
+            grey = 1;
+
+        printf("I am the master process\n");
+        best_fit_rows = best_fit(height, width, comm_sz);
+        if (!best_fit_rows) {
+            MPI_Abort(cartesianComm, 1);
+            return 1;
+        }
+        printf("%d\n", best_fit_rows);
+        rows = height / best_fit_rows;
+        columns = width / (comm_sz / best_fit_rows);
+        printf("%d %d\n", rows, columns);
+    }
+
+
+    picture = calloc((strlen(argv[5]) +1), sizeof(char));
+    assert( picture != NULL);
+    strncpy(picture, argv[5], strlen(argv[5]) + 1);
+
+    MPI_Bcast(&width, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&height, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&loops, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&grey, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&columns, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
+    MPI_Bcast(&best_fit_rows, 1, MPI_INT, MASTER_PROCESS, cartesianComm);
 
     //1. Find process row and column offsets and vector definition for the input data
-    
+
     int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
     int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
@@ -124,16 +124,16 @@ int main(int argc, char **argv) {
 
     assert(source_vec != NULL && destination_vec != NULL);
 
-	printf("I am the process %d %d, %d, %d, %d, %s with starting row index = %d and starting column index = %d\n", comm_rk, width, height, loops, grey, picture, row_index, column_index);
-    
+    printf("I am the process %d %d, %d, %d, %d, %s with starting row index = %d and starting column index = %d\n", comm_rk, width, height, loops, grey, picture, row_index, column_index);
+
     //2. Convolution filter definition
     float filter[3][3] = {{1/16.0, 2/16.0, 1/16.0},
-                          {2/16.0, 4/16.0, 2/16.0},
-                          {1/16.0, 2/16.0, 1/16.0}};
+        {2/16.0, 4/16.0, 2/16.0},
+        {1/16.0, 2/16.0, 1/16.0}};
 
 
     //3. Parallel read of the input file "image"
-    
+
     MPI_File picture_file = NULL;
     MPI_File_open(cartesianComm, picture, MPI_MODE_RDONLY, MPI_INFO_NULL, &picture_file);
 
@@ -153,16 +153,16 @@ int main(int argc, char **argv) {
 
 
     // Create columns for each process
-	int columns_number_based_on_type, columns_contiguous, rows_number_based_on_type, blocklength;
-	columns_number_based_on_type = (columns + 2) * multiplier;
+    int columns_number_based_on_type, columns_contiguous, rows_number_based_on_type, blocklength;
+    columns_number_based_on_type = (columns + 2) * multiplier;
     columns_contiguous = columns * multiplier;
-	rows_number_based_on_type = columns * multiplier;
-	blocklength = multiplier;
+    rows_number_based_on_type = columns * multiplier;
+    blocklength = multiplier;
 
-	MPI_Type_vector(rows, blocklength, columns_number_based_on_type, MPI_BYTE, &send_col);
-	MPI_Type_commit(&send_col);
-	MPI_Type_contiguous(rows_number_based_on_type, MPI_BYTE, &send_row);
-	MPI_Type_commit(&send_row);
+    MPI_Type_vector(rows, blocklength, columns_number_based_on_type, MPI_BYTE, &send_col);
+    MPI_Type_commit(&send_col);
+    MPI_Type_contiguous(rows_number_based_on_type, MPI_BYTE, &send_row);
+    MPI_Type_commit(&send_row);
 
     char *outputImage = calloc(strlen("out_image.raw") + 1, sizeof(char));
     strncpy(outputImage, "out_image.raw", strlen("out_image.raw"));
@@ -183,13 +183,13 @@ int main(int argc, char **argv) {
 
     MPI_File_close(&picture_file_out);
 
-   
+
 
     free(source_vec);
     free(destination_vec);
     free(outputImage);
     free(picture);
 
-	MPI_Finalize();
-	return 0;
+    MPI_Finalize();
+    return 0;
 }
