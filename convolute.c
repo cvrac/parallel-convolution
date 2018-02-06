@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include "mpi.h"
+#include <stdint.h>
 
 #define MASTER_PROCESS 0
 #define DIMENSIONALITY 2
@@ -35,6 +36,60 @@ unsigned int best_fit(int rows, int cols, int processes) {
         }
     }
     return best_fit_val;
+}
+
+void inner_convolute(unsigned char *src, unsigned char *dst, int end_row, int end_column, float h[3][3], int multiplier, int width, int height) {
+
+    int i = 0, j = 0;
+    float new_val = 0.0, red = 0.0, green = 0.0, blue = 0.0;
+
+    for (i = 1; i < end_row - 1; i++) {
+        for (j = 1; j < end_column - 1; j++) {
+            if (multiplier == 1) {
+                new_val = h[0][0] * src[(i - 1) * end_column + j-1] +
+                    h[0][1] * src[(i - 1) * end_column + j] +
+                    h[0][2] * src[(i - 1) * end_column + j+1] +
+                    h[1][0] * src[i * end_column + j-1] +
+                    h[1][1] * src[i * end_column + j] +
+                    h[1][2] * src[i * end_column + j+1] +
+                    h[2][0] * src[(i + 1) * end_column + j-1] +
+                    h[2][1] * src[(i + 1) * end_column + j] +
+                    h[2][2] * src[(i + 1) * end_column + j+1];
+                dst[i * end_column + j] = new_val;
+            } else {
+                red = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier] +
+                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier] +
+                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier] +
+                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier] +
+                    h[1][1] * src[i * end_column * multiplier + j * multiplier] +
+                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier] +
+                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier] +
+                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier] +
+                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier];
+                green = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier + 1] +
+                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier + 1] +
+                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier + 1] +
+                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier + 1] +
+                    h[1][1] * src[i * end_column * multiplier + j * multiplier + 1] +
+                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 1] +
+                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 1] +
+                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 1] +
+                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 1]; 
+                blue = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
+                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier + 2] +
+                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier + 2] +
+                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier + 2] +
+                    h[1][1] * src[i * end_column * multiplier + j * multiplier + 2] +
+                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 2] +
+                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
+                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 2] +
+                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 2]; 
+                dst[i * end_column * multiplier + j * multiplier] = red;
+                dst[i * end_column * multiplier + j * multiplier + 1] = green;
+                dst[i * end_column * multiplier + j * multiplier + 2] = blue;
+            }
+        }
+    }
 }
 
 int main(int argc, char **argv) {
@@ -112,7 +167,7 @@ int main(int argc, char **argv) {
     int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
     //swapping between source and destination vectors, using a temp vector
-    char *source_vec = NULL, *destination_vec = NULL, *temp_vec = NULL;
+    unsigned char *source_vec = NULL, *destination_vec = NULL, *temp_vec = NULL;
 
     //multiplier shall be 3 for RGB input pictures, 1 for GREY input pictures
     unsigned int multiplier = (grey == 1) ? 1 : 3;
@@ -131,6 +186,7 @@ int main(int argc, char **argv) {
         {2/16.0, 4/16.0, 2/16.0},
         {1/16.0, 2/16.0, 1/16.0}};
 
+//    float filter[3][3] = {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
 
     //3. Parallel read of the input file "image"
 
@@ -164,6 +220,14 @@ int main(int argc, char **argv) {
     MPI_Type_contiguous(rows_number_based_on_type, MPI_BYTE, &send_row);
     MPI_Type_commit(&send_row);
 
+
+    for (i = 0; i < 50; i++) {
+        inner_convolute(source_vec, destination_vec, rows + 2,  columns + 2, filter, multiplier, width, height);
+        temp_vec = source_vec;
+        source_vec = destination_vec;
+        destination_vec = temp_vec;
+    } 
+
     char *outputImage = calloc(strlen("out_image.raw") + 1, sizeof(char));
     strncpy(outputImage, "out_image.raw", strlen("out_image.raw"));
 
@@ -183,13 +247,10 @@ int main(int argc, char **argv) {
 
     MPI_File_close(&picture_file_out);
 
-
-
     free(source_vec);
     free(destination_vec);
     free(outputImage);
     free(picture);
 
     MPI_Finalize();
-    return 0;
 }
