@@ -166,6 +166,8 @@ int main(int argc, char **argv) {
     int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
     int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
+    printf("%d, %d, \n", row_index, column_index);
+
     //swapping between source and destination vectors, using a temp vector
     unsigned char *source_vec = NULL, *destination_vec = NULL, *temp_vec = NULL;
 
@@ -174,8 +176,8 @@ int main(int argc, char **argv) {
 
     int total_sz = width * height * multiplier;
 
-    source_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(char));
-    destination_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(char));
+    source_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(unsigned char));
+    destination_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(unsigned char));
 
     assert(source_vec != NULL && destination_vec != NULL);
 
@@ -198,9 +200,9 @@ int main(int argc, char **argv) {
      * to the appropriate index
      */
 
-    for (i = 0; i < rows; i++) {
-        MPI_File_seek(picture_file, multiplier * ((row_index + i) * width + column_index), MPI_SEEK_SET);
-        MPI_File_read(picture_file, source_vec + multiplier * columns * i + multiplier, multiplier * columns, MPI_BYTE, &status);
+    for (i = 1; i <= rows; i++) {
+        MPI_File_seek(picture_file, multiplier * ((row_index + i-1) * width + column_index), MPI_SEEK_SET);
+        MPI_File_read(picture_file, source_vec + multiplier * (columns + 2) * i + multiplier, multiplier * columns, MPI_BYTE, &status);
     }
 
     MPI_File_close(&picture_file);
@@ -221,8 +223,8 @@ int main(int argc, char **argv) {
     MPI_Type_commit(&send_row);
 
 
-    for (i = 0; i < 50; i++) {
-        inner_convolute(source_vec, destination_vec, rows + 2,  columns + 2, filter, multiplier, width, height);
+    for (i = 0; i < loops; i++) {
+        inner_convolute(source_vec, destination_vec, rows + 2, columns + 2, filter, multiplier, width, height);
         temp_vec = source_vec;
         source_vec = destination_vec;
         destination_vec = temp_vec;
@@ -240,9 +242,9 @@ int main(int argc, char **argv) {
      * to the appropriate index
      */
 
-    for (i = 0; i < rows; i++) {
-        MPI_File_seek(picture_file_out, multiplier * ((row_index + i) * width + column_index), MPI_SEEK_SET);
-        MPI_File_write(picture_file_out, source_vec + multiplier * columns * i + multiplier, multiplier * columns, MPI_BYTE, &status);
+    for (i = 1; i <= rows; i++) {
+        MPI_File_seek(picture_file_out, multiplier * ((row_index + i-1) * width + column_index), MPI_SEEK_SET);
+        MPI_File_write(picture_file_out, source_vec + multiplier * (columns + 2) * i + multiplier, multiplier * columns, MPI_BYTE, &status);
     }
 
     MPI_File_close(&picture_file_out);
