@@ -38,15 +38,15 @@ unsigned int best_fit(int rows, int cols, int processes) {
     return best_fit_val;
 }
 
-void inner_convolute(unsigned char *src, unsigned char *dst, int end_row, int end_column, float h[3][3], int multiplier, int width, int height) {
+void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier) {
 
     int i = 0, j = 0;
-    float new_val = 0.0, red = 0.0, green = 0.0, blue = 0.0;
+    float red = 0.0, green = 0.0, blue = 0.0;
 
-    for (i = 1; i < end_row - 1; i++) {
-        for (j = 1; j < end_column - 1; j++) {
+    for (i = start_row; i < end_row - 1; i++) {
+        for (j = start_column; j < end_column - 1; j++) {
             if (multiplier == 1) {
-                new_val = h[0][0] * src[(i - 1) * end_column + j-1] +
+                dst[i * end_column + j] = h[0][0] * src[(i - 1) * end_column + j-1] +
                     h[0][1] * src[(i - 1) * end_column + j] +
                     h[0][2] * src[(i - 1) * end_column + j+1] +
                     h[1][0] * src[i * end_column + j-1] +
@@ -55,7 +55,6 @@ void inner_convolute(unsigned char *src, unsigned char *dst, int end_row, int en
                     h[2][0] * src[(i + 1) * end_column + j-1] +
                     h[2][1] * src[(i + 1) * end_column + j] +
                     h[2][2] * src[(i + 1) * end_column + j+1];
-                dst[i * end_column + j] = new_val;
             } else {
                 red = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier] +
                     h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier] +
@@ -74,7 +73,7 @@ void inner_convolute(unsigned char *src, unsigned char *dst, int end_row, int en
                     h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 1] +
                     h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 1] +
                     h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 1] +
-                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 1]; 
+                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 1];
                 blue = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
                     h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier + 2] +
                     h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier + 2] +
@@ -83,7 +82,7 @@ void inner_convolute(unsigned char *src, unsigned char *dst, int end_row, int en
                     h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 2] +
                     h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
                     h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 2] +
-                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 2]; 
+                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 2];
                 dst[i * end_column * multiplier + j * multiplier] = red;
                 dst[i * end_column * multiplier + j * multiplier + 1] = green;
                 dst[i * end_column * multiplier + j * multiplier + 2] = blue;
@@ -100,22 +99,34 @@ int main(int argc, char **argv) {
     int rows = 0, columns = 0;
     int proc_row = -1, proc_col = -1;
     int i = 0;
+    int north, south, east, west;
+    unsigned char* se_north_pos, se_south_pos, se_east_pos, se_west_pos, rcv_north_pos, rcv_south_pos, rcv_east_pos, rcv_west_pos;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
     MPI_Comm_rank(MPI_COMM_WORLD, &comm_rk);
 
+
+    // General Case
+    MPI_Request se_north_request;
+    MPI_Request se_east_request;
+    MPI_Request se_south_request;
+    MPI_Request se_west_request;
+    MPI_Request rcv_north_request;
+    MPI_Request rcv_east_request;
+    MPI_Request rcv_south_request;
+    MPI_Request rcv_west_request;
+    // Boundary Case - Single Elements
     MPI_Request se_nr_request;
     MPI_Request se_ea_request;
     MPI_Request se_so_request;
     MPI_Request se_we_request;
     MPI_Request rcv_nr_request;
     MPI_Request rcv_ea_request;
-    MPI_Request rcv_so_request;	
-    MPI_Request rcv_we_request;	
+    MPI_Request rcv_so_request;
+    MPI_Request rcv_we_request;
     MPI_Status status;
-
 
     MPI_Datatype send_col, send_row;
 
@@ -124,8 +135,12 @@ int main(int argc, char **argv) {
     int dims[DIMENSIONALITY] = {0, 0};
     int periods[2] = {0, 0};
     int reorder = 1;
+
+    north = south = east = west = MPI_PROC_NULL;
     MPI_Dims_create(comm_sz, DIMENSIONALITY, dims);
     MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
+		MPI_Cart_shift(cartesianComm, 1, 1, &west, &east);
+		MPI_Cart_shift(cartesianComm, 0, 1, &north, &south);
 
     // Variables setup
     int best_fit_rows;
@@ -222,13 +237,58 @@ int main(int argc, char **argv) {
     MPI_Type_contiguous(rows_number_based_on_type, MPI_BYTE, &send_row);
     MPI_Type_commit(&send_row);
 
-
     for (i = 0; i < loops; i++) {
-        inner_convolute(source_vec, destination_vec, rows + 2, columns + 2, filter, multiplier, width, height);
+        // Calculate what each process should send
+
+        unsigned char* se_north_pos = source_vec + (columns + 2) * multiplier + multiplier;
+        unsigned char* rcv_north_pos = source_vec + multiplier;
+        unsigned char* se_south_pos = source_vec + (rows) * (columns + 2)* multiplier + multiplier;
+        unsigned char* rcv_south_pos = source_vec + (rows + 1) * (columns + 2)* multiplier + multiplier;
+        unsigned char* se_east_pos = source_vec + (2 * columns + 2) * multiplier;
+        unsigned char* rcv_east_pos = source_vec + (2 * columns + 2)* multiplier + multiplier;
+        unsigned char* se_west_pos = source_vec + (columns + 2) * multiplier + multiplier;
+        unsigned char* rcv_west_pos = source_vec + (columns + 2) * multiplier;
+  			//North
+  			MPI_Isend(se_north_pos, 1, send_row, north, 0, cartesianComm, &se_north_request);
+  			MPI_Irecv(rcv_north_pos, 1, send_row, north, 0, cartesianComm, &rcv_north_request);
+  			//South
+  			MPI_Isend(se_south_pos, 1, send_row, south, 0, cartesianComm, &se_south_request);
+  			MPI_Irecv(rcv_south_pos, 1, send_row, south, 0, cartesianComm, &rcv_south_request);
+  			//East
+  			MPI_Isend(se_east_pos, 1, send_col, east, 0, cartesianComm, &se_east_request);
+  			MPI_Irecv(rcv_east_pos, 1, send_col, east, 0, cartesianComm, &rcv_east_request);
+  			//West
+  			MPI_Isend(se_west_pos, 1, send_col, west, 0, cartesianComm, &se_west_request);
+  			MPI_Irecv(rcv_west_pos, 1, send_col, west, 0, cartesianComm, &rcv_west_request);
+
+        convolute(source_vec, destination_vec, 1, 1, rows + 2, columns + 2, filter, multiplier);
+
+  			if(north != MPI_PROC_NULL) {
+  				MPI_Wait(&rcv_north_request, MPI_STATUS_IGNORE);
+          convolute(source_vec, destination_vec, 1, 2, 1, columns+1, filter, multiplier);
+  			}
+  			if(south != MPI_PROC_NULL) {
+  				MPI_Wait(&rcv_south_request, MPI_STATUS_IGNORE);
+          convolute(source_vec, destination_vec, rows + 2, 2, rows + 2, columns + 1, filter, multiplier);
+  			}
+  			if(east != MPI_PROC_NULL) {
+  				MPI_Wait(&rcv_east_request, MPI_STATUS_IGNORE);
+          convolute(source_vec, destination_vec, 2, columns + 2, rows + 1, columns + 2, filter, multiplier);
+  			}
+  			if(west != MPI_PROC_NULL) {
+  				MPI_Wait(&rcv_west_request, MPI_STATUS_IGNORE);
+          convolute(source_vec, destination_vec, 2, 1, rows + 1, 1, filter, multiplier);
+  			}
+
+        MPI_Wait(&se_north_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_south_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_east_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_west_request, MPI_STATUS_IGNORE);
+
         temp_vec = source_vec;
         source_vec = destination_vec;
         destination_vec = temp_vec;
-    } 
+    }
 
     char *outputImage = calloc(strlen("out_image.raw") + 1, sizeof(char));
     strncpy(outputImage, "out_image.raw", strlen("out_image.raw"));
