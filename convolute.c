@@ -38,7 +38,7 @@ unsigned int best_fit(int rows, int cols, int processes) {
     return best_fit_val;
 }
 
-void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier) {
+void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height) {
 
     int i = 0, j = 0;
     float red = 0.0, green = 0.0, blue = 0.0;
@@ -46,46 +46,46 @@ void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_
     for (i = start_row; i < end_row - 1; i++) {
         for (j = start_column; j < end_column - 1; j++) {
             if (multiplier == 1) {
-                dst[i * end_column + j] = h[0][0] * src[(i - 1) * end_column + j-1] +
-                    h[0][1] * src[(i - 1) * end_column + j] +
-                    h[0][2] * src[(i - 1) * end_column + j+1] +
-                    h[1][0] * src[i * end_column + j-1] +
-                    h[1][1] * src[i * end_column + j] +
-                    h[1][2] * src[i * end_column + j+1] +
-                    h[2][0] * src[(i + 1) * end_column + j-1] +
-                    h[2][1] * src[(i + 1) * end_column + j] +
-                    h[2][2] * src[(i + 1) * end_column + j+1];
+                dst[i * height + j] = h[0][0] * src[(i - 1) * height + j-1] +
+                    h[0][1] * src[(i - 1) * height + j] +
+                    h[0][2] * src[(i - 1) * height + j+1] +
+                    h[1][0] * src[i * height + j-1] +
+                    h[1][1] * src[i * height + j] +
+                    h[1][2] * src[i * height + j+1] +
+                    h[2][0] * src[(i + 1) * height + j-1] +
+                    h[2][1] * src[(i + 1) * height + j] +
+                    h[2][2] * src[(i + 1) * height + j+1];
             } else {
-                red = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier] +
-                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier] +
-                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier] +
-                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier] +
-                    h[1][1] * src[i * end_column * multiplier + j * multiplier] +
-                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier] +
-                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier] +
-                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier] +
-                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier];
-                green = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier + 1] +
-                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier + 1] +
-                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier + 1] +
-                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier + 1] +
-                    h[1][1] * src[i * end_column * multiplier + j * multiplier + 1] +
-                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 1] +
-                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 1] +
-                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 1] +
-                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 1];
-                blue = h[0][0] * src[(i - 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
-                    h[0][1] * src[(i - 1) * end_column * multiplier + j * multiplier + 2] +
-                    h[0][2] * src[(i - 1) * end_column * multiplier + j * multiplier + multiplier + 2] +
-                    h[1][0] * src[i * end_column * multiplier + j * multiplier - multiplier + 2] +
-                    h[1][1] * src[i * end_column * multiplier + j * multiplier + 2] +
-                    h[1][2] * src[i * end_column * multiplier + j * multiplier + multiplier + 2] +
-                    h[2][0] * src[(i + 1) * end_column * multiplier + j * multiplier - multiplier + 2] +
-                    h[2][1] * src[(i + 1) * end_column * multiplier + j * multiplier + 2] +
-                    h[2][2] * src[(i + 1) * end_column * multiplier + j * multiplier + multiplier + 2];
-                dst[i * end_column * multiplier + j * multiplier] = red;
-                dst[i * end_column * multiplier + j * multiplier + 1] = green;
-                dst[i * end_column * multiplier + j * multiplier + 2] = blue;
+                red = h[0][0] * src[(i - 1) * height * multiplier + j * multiplier - multiplier] +
+                    h[0][1] * src[(i - 1) * height * multiplier + j * multiplier] +
+                    h[0][2] * src[(i - 1) * height * multiplier + j * multiplier + multiplier] +
+                    h[1][0] * src[i * height * multiplier + j * multiplier - multiplier] +
+                    h[1][1] * src[i * height * multiplier + j * multiplier] +
+                    h[1][2] * src[i * height * multiplier + j * multiplier + multiplier] +
+                    h[2][0] * src[(i + 1) * height * multiplier + j * multiplier - multiplier] +
+                    h[2][1] * src[(i + 1) * height * multiplier + j * multiplier] +
+                    h[2][2] * src[(i + 1) * height * multiplier + j * multiplier + multiplier];
+                green = h[0][0] * src[(i - 1) * height * multiplier + j * multiplier - multiplier + 1] +
+                    h[0][1] * src[(i - 1) * height * multiplier + j * multiplier + 1] +
+                    h[0][2] * src[(i - 1) * height * multiplier + j * multiplier + multiplier + 1] +
+                    h[1][0] * src[i * height * multiplier + j * multiplier - multiplier + 1] +
+                    h[1][1] * src[i * height * multiplier + j * multiplier + 1] +
+                    h[1][2] * src[i * height * multiplier + j * multiplier + multiplier + 1] +
+                    h[2][0] * src[(i + 1) * height * multiplier + j * multiplier - multiplier + 1] +
+                    h[2][1] * src[(i + 1) * height * multiplier + j * multiplier + 1] +
+                    h[2][2] * src[(i + 1) * height * multiplier + j * multiplier + multiplier + 1];
+                blue = h[0][0] * src[(i - 1) * height * multiplier + j * multiplier - multiplier + 2] +
+                    h[0][1] * src[(i - 1) * height * multiplier + j * multiplier + 2] +
+                    h[0][2] * src[(i - 1) * height * multiplier + j * multiplier + multiplier + 2] +
+                    h[1][0] * src[i * height * multiplier + j * multiplier - multiplier + 2] +
+                    h[1][1] * src[i * height * multiplier + j * multiplier + 2] +
+                    h[1][2] * src[i * height * multiplier + j * multiplier + multiplier + 2] +
+                    h[2][0] * src[(i + 1) * height * multiplier + j * multiplier - multiplier + 2] +
+                    h[2][1] * src[(i + 1) * height * multiplier + j * multiplier + 2] +
+                    h[2][2] * src[(i + 1) * height * multiplier + j * multiplier + multiplier + 2];
+                dst[i * height * multiplier + j * multiplier] = red;
+                dst[i * height * multiplier + j * multiplier + 1] = green;
+                dst[i * height * multiplier + j * multiplier + 2] = blue;
             }
         }
     }
@@ -100,13 +100,13 @@ int main(int argc, char **argv) {
     int proc_row = -1, proc_col = -1;
     int i = 0;
     int north, south, east, west;
+    int north_west, north_east, south_west, south_east;
     unsigned char* se_north_pos, se_south_pos, se_east_pos, se_west_pos, rcv_north_pos, rcv_south_pos, rcv_east_pos, rcv_west_pos;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
     MPI_Comm_rank(MPI_COMM_WORLD, &comm_rk);
-
 
     // General Case
     MPI_Request se_north_request;
@@ -118,17 +118,17 @@ int main(int argc, char **argv) {
     MPI_Request rcv_south_request;
     MPI_Request rcv_west_request;
     // Boundary Case - Single Elements
-    MPI_Request se_nr_request;
-    MPI_Request se_ea_request;
-    MPI_Request se_so_request;
-    MPI_Request se_we_request;
-    MPI_Request rcv_nr_request;
-    MPI_Request rcv_ea_request;
-    MPI_Request rcv_so_request;
-    MPI_Request rcv_we_request;
+    MPI_Request se_nw_request;
+    MPI_Request se_ne_request;
+    MPI_Request se_se_request;
+    MPI_Request se_sw_request;
+    MPI_Request rcv_nw_request;
+    MPI_Request rcv_ne_request;
+    MPI_Request rcv_se_request;
+    MPI_Request rcv_sw_request;
     MPI_Status status;
 
-    MPI_Datatype send_col, send_row;
+    MPI_Datatype send_col, send_row, send_corner;
 
     // Cartesian topology definition
     MPI_Comm cartesianComm;
@@ -139,28 +139,53 @@ int main(int argc, char **argv) {
     north = south = east = west = MPI_PROC_NULL;
     MPI_Dims_create(comm_sz, DIMENSIONALITY, dims);
     MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
+    MPI_Comm_set_errhandler(cartesianComm, MPI_ERRORS_RETURN);
 		MPI_Cart_shift(cartesianComm, 1, 1, &west, &east);
 		MPI_Cart_shift(cartesianComm, 0, 1, &north, &south);
+    int coords[DIMENSIONALITY];
+    MPI_Cart_coords(cartesianComm, comm_rk, DIMENSIONALITY, coords);
 
+    //North West
+    int nw_coords[DIMENSIONALITY];
+    nw_coords[0] = coords[0] - 1; nw_coords[1] = coords[1] - 1;
+    if(MPI_Cart_rank(cartesianComm, nw_coords, &north_west))
+      north_west = MPI_PROC_NULL;
+    //North East
+    int ne_coords[DIMENSIONALITY];
+    ne_coords[0] = coords[0] - 1; ne_coords[1] = coords[1] + 1;
+    if(MPI_Cart_rank(cartesianComm, ne_coords, &north_east))
+      north_east = MPI_PROC_NULL;
+    // South West
+    int sw_coords[DIMENSIONALITY];
+    sw_coords[0] = coords[0] + 1; sw_coords[1] = coords[1] - 1;
+    if(MPI_Cart_rank(cartesianComm, sw_coords, &south_west))
+      south_west = MPI_PROC_NULL;
+
+    // South East
+    int se_coords[DIMENSIONALITY];
+    se_coords[0] = coords[0] + 1; se_coords[1] = coords[1] + 1;
+    if(MPI_Cart_rank(cartesianComm, se_coords, &south_east))
+      south_east = MPI_PROC_NULL;
+    // printf("Comm rank: %d, NW: %d, NE: %d, SW: %d, SE: %d \n", comm_rk, north_west, north_east, south_west, south_east);
     // Variables setup
     int best_fit_rows;
     if (comm_rk == MASTER_PROCESS) {
         width = atoi(argv[1]); height = atoi(argv[2]);
         loops = atoi(argv[3]);
-        printf("MASTER SAYS %d\n", height);
+        // printf("MASTER SAYS %d\n", height);
         if (!strcmp(argv[4], "grey"))
             grey = 1;
 
-        printf("I am the master process\n");
+        // printf("I am the master process\n");
         best_fit_rows = best_fit(height, width, comm_sz);
         if (!best_fit_rows) {
             MPI_Abort(cartesianComm, 1);
             return 1;
         }
-        printf("%d\n", best_fit_rows);
+        // printf("%d\n", best_fit_rows);
         rows = height / best_fit_rows;
         columns = width / (comm_sz / best_fit_rows);
-        printf("%d %d\n", rows, columns);
+        // printf("%d %d\n", rows, columns);
     }
 
 
@@ -222,7 +247,7 @@ int main(int argc, char **argv) {
 
     MPI_File_close(&picture_file);
 
-    printf("read file\n");
+    // printf("read file\n");
 
 
     // Create columns for each process
@@ -237,17 +262,24 @@ int main(int argc, char **argv) {
     MPI_Type_contiguous(rows_number_based_on_type, MPI_BYTE, &send_row);
     MPI_Type_commit(&send_row);
 
+    MPI_Type_vector(1, blocklength, 1, MPI_BYTE, &send_corner);
+    MPI_Type_commit(&send_corner);
+
     for (i = 0; i < loops; i++) {
         // Calculate what each process should send
-
-        unsigned char* se_north_pos = source_vec + (columns + 2) * multiplier + multiplier;
+        // Datatypes calculation
+        unsigned char* se_north_pos  = source_vec + (columns + 2) * multiplier + multiplier;
         unsigned char* rcv_north_pos = source_vec + multiplier;
-        unsigned char* se_south_pos = source_vec + (rows) * (columns + 2)* multiplier + multiplier;
+        unsigned char* se_south_pos  = source_vec + (rows) * (columns + 2) * multiplier + multiplier;
         unsigned char* rcv_south_pos = source_vec + (rows + 1) * (columns + 2)* multiplier + multiplier;
-        unsigned char* se_east_pos = source_vec + (2 * columns + 2) * multiplier;
-        unsigned char* rcv_east_pos = source_vec + (2 * columns + 2)* multiplier + multiplier;
-        unsigned char* se_west_pos = source_vec + (columns + 2) * multiplier + multiplier;
-        unsigned char* rcv_west_pos = source_vec + (columns + 2) * multiplier;
+        unsigned char* se_east_pos   = source_vec + (2 * columns + 2) * multiplier;
+        unsigned char* rcv_east_pos  = source_vec + (2 * columns + 2)* multiplier + multiplier;
+        unsigned char* se_west_pos   = source_vec + (columns + 2) * multiplier + multiplier;
+        unsigned char* rcv_west_pos  = source_vec + (columns + 2) * multiplier;
+
+        // Corner Elements
+        unsigned char* rcv_nw_pos = source_vec;
+        unsigned char* rcv_ne_pos = source_vec + rows * (columns + 2) * multiplier + multiplier;
   			//North
   			MPI_Isend(se_north_pos, 1, send_row, north, 0, cartesianComm, &se_north_request);
   			MPI_Irecv(rcv_north_pos, 1, send_row, north, 0, cartesianComm, &rcv_north_request);
@@ -261,29 +293,49 @@ int main(int argc, char **argv) {
   			MPI_Isend(se_west_pos, 1, send_col, west, 0, cartesianComm, &se_west_request);
   			MPI_Irecv(rcv_west_pos, 1, send_col, west, 0, cartesianComm, &rcv_west_request);
 
-        convolute(source_vec, destination_vec, 1, 1, rows + 2, columns + 2, filter, multiplier);
+        // Corner Elements
+        //NorthWest
+        MPI_Isend(se_north_pos, 1, send_corner, north_west, 0, cartesianComm, &se_nw_request);
+        MPI_Irecv(rcv_nw_pos, 1, send_corner, north_west, 0, cartesianComm, &rcv_nw_request);
+        //NorthEast
+        MPI_Isend(se_east_pos, 1, send_corner, north_east, 0, cartesianComm, &se_ne_request);
+        MPI_Irecv((unsigned char*)(source_vec + (columns + 1) * multiplier), 1, send_corner, north_east, 0, cartesianComm, &rcv_ne_request);
+        //SouthWest
+        MPI_Isend((unsigned char*)(source_vec + (rows * (columns + 2) + 1) * multiplier), 1, send_corner, south_west, 0, cartesianComm, &se_sw_request);
+        MPI_Irecv((unsigned char*)(source_vec + ((rows + 1) * (columns + 2) * multiplier)), 1, send_corner, south_west, 0, cartesianComm, &rcv_sw_request);
+        //SouthEast
+        MPI_Isend((unsigned char*)(source_vec + ((rows * (columns + 2) + columns)* multiplier)), 1, send_corner, south_east, 0, cartesianComm, &se_se_request);
+        MPI_Irecv((unsigned char*)(source_vec + (rows  + 1) * (columns + 2) * multiplier), 1, send_corner, south_east, 0, cartesianComm, &rcv_se_request);
+        //Inner Convolute
+        convolute(source_vec, destination_vec, 2, 2, rows + 1, columns + 1, filter, multiplier, columns + 2);
 
-  			if(north != MPI_PROC_NULL) {
-  				MPI_Wait(&rcv_north_request, MPI_STATUS_IGNORE);
-          convolute(source_vec, destination_vec, 1, 2, 1, columns+1, filter, multiplier);
-  			}
-  			if(south != MPI_PROC_NULL) {
-  				MPI_Wait(&rcv_south_request, MPI_STATUS_IGNORE);
-          convolute(source_vec, destination_vec, rows + 2, 2, rows + 2, columns + 1, filter, multiplier);
-  			}
-  			if(east != MPI_PROC_NULL) {
-  				MPI_Wait(&rcv_east_request, MPI_STATUS_IGNORE);
-          convolute(source_vec, destination_vec, 2, columns + 2, rows + 1, columns + 2, filter, multiplier);
-  			}
-  			if(west != MPI_PROC_NULL) {
-  				MPI_Wait(&rcv_west_request, MPI_STATUS_IGNORE);
-          convolute(source_vec, destination_vec, 2, 1, rows + 1, 1, filter, multiplier);
-  			}
-
+        // Outer Elements Convolute (Wait for Receive)
+				MPI_Wait(&rcv_north_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, 1, 2, 3, columns + 1, filter, multiplier, columns + 2); // North
+        MPI_Wait(&rcv_south_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, rows, 2, rows + 3, columns + 1, filter, multiplier, columns + 2); // South
+        MPI_Wait(&rcv_east_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, 2, columns, rows + 1, columns + 2, filter, multiplier, columns + 2); // East
+        MPI_Wait(&rcv_west_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, 2, 1, rows + 1, 3, filter, multiplier, columns + 2); // West
+				// Wait for corner items
+        MPI_Wait(&rcv_nw_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, 1, 1, 3, 3, filter, multiplier, columns + 2); // NorthWest
+				MPI_Wait(&rcv_ne_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, 1, columns, 3, columns + 2, filter, multiplier, columns + 2); // NorthEast
+				MPI_Wait(&rcv_se_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, rows, columns, rows + 2, columns + 2, filter, multiplier, columns + 2); // SouthEast
+				MPI_Wait(&rcv_sw_request, MPI_STATUS_IGNORE);
+        convolute(source_vec, destination_vec, rows, 1, rows + 2, 3, filter, multiplier, columns + 2); // SouthWest
+        // Wait for Send
         MPI_Wait(&se_north_request, MPI_STATUS_IGNORE);
   			MPI_Wait(&se_south_request, MPI_STATUS_IGNORE);
   			MPI_Wait(&se_east_request, MPI_STATUS_IGNORE);
   			MPI_Wait(&se_west_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_nw_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_ne_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_sw_request, MPI_STATUS_IGNORE);
+  			MPI_Wait(&se_se_request, MPI_STATUS_IGNORE);
 
         temp_vec = source_vec;
         source_vec = destination_vec;
@@ -315,4 +367,5 @@ int main(int argc, char **argv) {
     free(picture);
 
     MPI_Finalize();
+    return 0;
 }
