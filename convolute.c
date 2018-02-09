@@ -10,6 +10,7 @@
 #define MASTER_PROCESS 0
 #define DIMENSIONALITY 2
 
+void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height);
 
 /*
  * 1. Find process row and column offsets and vector definition for the input data
@@ -38,7 +39,7 @@ unsigned int best_fit(int rows, int cols, int processes) {
     return best_fit_val;
 }
 
-void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height) {
+inline void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height) {
 
     int i = 0, j = 0;
     float red = 0.0, green = 0.0, blue = 0.0;
