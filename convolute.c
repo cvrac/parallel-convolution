@@ -6,9 +6,11 @@
 #include <assert.h>
 #include "mpi.h"
 #include <stdint.h>
+#include <math.h>
 
 #define MASTER_PROCESS 0
 #define DIMENSIONALITY 2
+#define CONVERGENCE_CHECK 5
 
 void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height);
 
@@ -141,8 +143,8 @@ int main(int argc, char **argv) {
     MPI_Dims_create(comm_sz, DIMENSIONALITY, dims);
     MPI_Cart_create(MPI_COMM_WORLD, DIMENSIONALITY, dims, periods, reorder, &cartesianComm);
     MPI_Comm_set_errhandler(cartesianComm, MPI_ERRORS_RETURN);
-		MPI_Cart_shift(cartesianComm, 1, 1, &west, &east);
-		MPI_Cart_shift(cartesianComm, 0, 1, &north, &south);
+    MPI_Cart_shift(cartesianComm, 1, 1, &west, &east);
+    MPI_Cart_shift(cartesianComm, 0, 1, &north, &south);
     int coords[DIMENSIONALITY];
     MPI_Cart_coords(cartesianComm, comm_rk, DIMENSIONALITY, coords);
 
@@ -150,23 +152,23 @@ int main(int argc, char **argv) {
     int nw_coords[DIMENSIONALITY];
     nw_coords[0] = coords[0] - 1; nw_coords[1] = coords[1] - 1;
     if(MPI_Cart_rank(cartesianComm, nw_coords, &north_west))
-      north_west = MPI_PROC_NULL;
+        north_west = MPI_PROC_NULL;
     //North East
     int ne_coords[DIMENSIONALITY];
     ne_coords[0] = coords[0] - 1; ne_coords[1] = coords[1] + 1;
     if(MPI_Cart_rank(cartesianComm, ne_coords, &north_east))
-      north_east = MPI_PROC_NULL;
+        north_east = MPI_PROC_NULL;
     // South West
     int sw_coords[DIMENSIONALITY];
     sw_coords[0] = coords[0] + 1; sw_coords[1] = coords[1] - 1;
     if(MPI_Cart_rank(cartesianComm, sw_coords, &south_west))
-      south_west = MPI_PROC_NULL;
+        south_west = MPI_PROC_NULL;
 
     // South East
     int se_coords[DIMENSIONALITY];
     se_coords[0] = coords[0] + 1; se_coords[1] = coords[1] + 1;
     if(MPI_Cart_rank(cartesianComm, se_coords, &south_east))
-      south_east = MPI_PROC_NULL;
+        south_east = MPI_PROC_NULL;
     // printf("Comm rank: %d, NW: %d, NE: %d, SW: %d, SE: %d \n", comm_rk, north_west, north_east, south_west, south_east);
     // Variables setup
     int best_fit_rows;
@@ -229,7 +231,7 @@ int main(int argc, char **argv) {
         {2/16.0, 4/16.0, 2/16.0},
         {1/16.0, 2/16.0, 1/16.0}};
 
-//    float filter[3][3] = {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
+    //    float filter[3][3] = {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
 
     //3. Parallel read of the input file "image"
 
@@ -270,7 +272,8 @@ int main(int argc, char **argv) {
 
     double start_time = MPI_Wtime();
 
-    for (i = 0; i < loops; i++) {
+    int t = 0, total_convergence = 0;
+    for (t = 0; t < loops; t++) {
         // Calculate what each process should send
         // Datatypes calculation
         unsigned char* se_north_pos  = source_vec + (columns + 2) * multiplier + multiplier;
@@ -285,18 +288,18 @@ int main(int argc, char **argv) {
         // Corner Elements
         unsigned char* rcv_nw_pos = source_vec;
         unsigned char* rcv_ne_pos = source_vec + rows * (columns + 2) * multiplier + multiplier;
-  			//North
-  			MPI_Isend(se_north_pos, 1, send_row, north, 0, cartesianComm, &se_north_request);
-  			MPI_Irecv(rcv_north_pos, 1, send_row, north, 0, cartesianComm, &rcv_north_request);
-  			//South
-  			MPI_Isend(se_south_pos, 1, send_row, south, 0, cartesianComm, &se_south_request);
-  			MPI_Irecv(rcv_south_pos, 1, send_row, south, 0, cartesianComm, &rcv_south_request);
-  			//East
-  			MPI_Isend(se_east_pos, 1, send_col, east, 0, cartesianComm, &se_east_request);
-  			MPI_Irecv(rcv_east_pos, 1, send_col, east, 0, cartesianComm, &rcv_east_request);
-  			//West
-  			MPI_Isend(se_west_pos, 1, send_col, west, 0, cartesianComm, &se_west_request);
-  			MPI_Irecv(rcv_west_pos, 1, send_col, west, 0, cartesianComm, &rcv_west_request);
+        //North
+        MPI_Isend(se_north_pos, 1, send_row, north, 0, cartesianComm, &se_north_request);
+        MPI_Irecv(rcv_north_pos, 1, send_row, north, 0, cartesianComm, &rcv_north_request);
+        //South
+        MPI_Isend(se_south_pos, 1, send_row, south, 0, cartesianComm, &se_south_request);
+        MPI_Irecv(rcv_south_pos, 1, send_row, south, 0, cartesianComm, &rcv_south_request);
+        //East
+        MPI_Isend(se_east_pos, 1, send_col, east, 0, cartesianComm, &se_east_request);
+        MPI_Irecv(rcv_east_pos, 1, send_col, east, 0, cartesianComm, &rcv_east_request);
+        //West
+        MPI_Isend(se_west_pos, 1, send_col, west, 0, cartesianComm, &se_west_request);
+        MPI_Irecv(rcv_west_pos, 1, send_col, west, 0, cartesianComm, &rcv_west_request);
 
         // Corner Elements
         //NorthWest
@@ -315,7 +318,7 @@ int main(int argc, char **argv) {
         convolute(source_vec, destination_vec, 2, 2, rows + 1, columns + 1, filter, multiplier, columns + 2);
 
         // Outer Elements Convolute (Wait for Receive)
-				MPI_Wait(&rcv_north_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&rcv_north_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, 1, 2, 3, columns + 1, filter, multiplier, columns + 2); // North
         MPI_Wait(&rcv_south_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, rows, 2, rows + 3, columns + 1, filter, multiplier, columns + 2); // South
@@ -323,28 +326,48 @@ int main(int argc, char **argv) {
         convolute(source_vec, destination_vec, 2, columns, rows + 1, columns + 2, filter, multiplier, columns + 2); // East
         MPI_Wait(&rcv_west_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, 2, 1, rows + 1, 3, filter, multiplier, columns + 2); // West
-				// Wait for corner items
+        // Wait for corner items
         MPI_Wait(&rcv_nw_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, 1, 1, 3, 3, filter, multiplier, columns + 2); // NorthWest
-				MPI_Wait(&rcv_ne_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&rcv_ne_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, 1, columns, 3, columns + 2, filter, multiplier, columns + 2); // NorthEast
-				MPI_Wait(&rcv_se_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&rcv_se_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, rows, columns, rows + 2, columns + 2, filter, multiplier, columns + 2); // SouthEast
-				MPI_Wait(&rcv_sw_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&rcv_sw_request, MPI_STATUS_IGNORE);
         convolute(source_vec, destination_vec, rows, 1, rows + 2, 3, filter, multiplier, columns + 2); // SouthWest
+
+
+        /*Convergence check, using AllReduce*/
+        int local_convergence = 1;
+        if (t % CONVERGENCE_CHECK == 0) {
+            int i, j;
+            for (i = 0; i < rows + 2; i++) 
+                for (j = 0; j < columns + 2; j++)
+                    if (destination_vec[multiplier * i * (columns + 2) + j * multiplier] & source_vec[multiplier * i * (columns + 2) + j * multiplier] == 0)
+                        local_convergence = 0;
+            MPI_Allreduce(&local_convergence, &total_convergence, 1, MPI_INT, MPI_LAND, cartesianComm);
+        }
+
         // Wait for Send
         MPI_Wait(&se_north_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_south_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_east_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_west_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_south_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_east_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_west_request, MPI_STATUS_IGNORE);
         MPI_Wait(&se_nw_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_ne_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_sw_request, MPI_STATUS_IGNORE);
-  			MPI_Wait(&se_se_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_ne_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_sw_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&se_se_request, MPI_STATUS_IGNORE);
 
         temp_vec = source_vec;
         source_vec = destination_vec;
         destination_vec = temp_vec;
+
+        if (total_convergence > 0)
+            printf("Convergence occured at loop %d\n", t);
+        else {
+            total_convergence = 0;
+            printf("No convergence\n");
+        }
     }
 
     MPI_Barrier(cartesianComm);
