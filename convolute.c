@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
     int i = 0;
     int north, south, east, west;
     int north_west, north_east, south_west, south_east;
+    int first_converge = 1;
 
     MPI_Init(&argc, &argv);
 
@@ -315,11 +316,27 @@ int main(int argc, char **argv) {
         int local_convergence = 1;
         if (t % CONVERGENCE_CHECK == 0) {
             int i, j;
-            for (i = 0; i < rows + 2; i++)
-                for (j = 0; j < columns + 2; j++)
-                    if ((destination_vec[multiplier * i * (columns + 2) + j * multiplier] & source_vec[multiplier * i * (columns + 2) + j * multiplier]) == 0)
-                        local_convergence = 0;
+            if (grey) {
+              for (i = 0; i < rows + 2; i++)
+                  for (j = 0; j < columns + 2; j++)
+                      if (destination_vec[i * (columns + 2) + j ] != source_vec[i * (columns + 2) + j])
+                          local_convergence = 0;
+            } else {
+              //RGB
+                for (i = 0; i < rows + 2; i++)
+                    for (j = 0; j < columns + 2; j++)
+                        if (destination_vec[i * (columns + 2) * 3 + j * 3] != source_vec[i * (columns + 2) * 3 + j * 3] ||
+                            destination_vec[i * (columns + 2) * 3 + j * 3 + 1] != source_vec[i * (columns + 2) * 3 + j * 3 + 1] ||
+                            destination_vec[i * (columns + 2) * 3 + j * 3 + 2] != source_vec[i * (columns + 2) * 3 + j * 3 + 2]) {
+                              local_convergence = 0;
+                        }
+            }
+
             MPI_Allreduce(&local_convergence, &total_convergence, 1, MPI_INT, MPI_LAND, cartesianComm);
+            if (total_convergence > 0 && first_converge) {
+              convergence_at_loop = t;
+              first_converge = 0;
+            }
         }
 
         // Wait for Send
@@ -336,9 +353,6 @@ int main(int argc, char **argv) {
         source_vec = destination_vec;
         destination_vec = temp_vec;
 
-        if (total_convergence > 0) {
-          convergence_at_loop = t;
-        }
     }
 
     MPI_Barrier(cartesianComm);
