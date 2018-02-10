@@ -7,6 +7,7 @@
 #include "mpi.h"
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 
 #define MASTER_PROCESS 0
 #define DIMENSIONALITY 2
@@ -95,6 +96,7 @@ int main(int argc, char **argv) {
     int north, south, east, west;
     int north_west, north_east, south_west, south_east;
     int first_converge = 1;
+    srand(time(NULL));
 
     MPI_Init(&argc, &argv);
 
@@ -214,20 +216,39 @@ int main(int argc, char **argv) {
 
     //3. Parallel read of the input file "image"
 
-    MPI_File picture_file = NULL;
-    MPI_File_open(cartesianComm, picture, MPI_MODE_RDONLY, MPI_INFO_NULL, &picture_file);
+    if (!strcmp("random", picture)) {
+      if (grey) {
+        for (i = 1; i <= rows; i++) {
+          for (int j = 1 ; j <= columns; j++) {
+            source_vec[i * (columns + 2) * multiplier + j * multiplier] = rand() % 254;
+          }
+        }
+      } else {
+          for (i = 1; i <= rows; i++) {
+            for (int j = 1 ; j <= columns; j++) {
+              source_vec[i * (columns + 2) * 3 + j * 3] = rand() % 254;
+              source_vec[i * (columns + 2) * 3 + j * 3 + 1] = rand() % 254;
+              source_vec[i * (columns + 2) * 3 + j * 3 + 2] = rand() % 254;
+            }
+          }
+      }
 
-    /*
-     * Each process reads the corresponding block of data from the file, and stores it
-     * to the appropriate index
-     */
+    } else {
+        MPI_File picture_file = NULL;
+        MPI_File_open(cartesianComm, picture, MPI_MODE_RDONLY, MPI_INFO_NULL, &picture_file);
 
-    for (i = 1; i <= rows; i++) {
-        MPI_File_seek(picture_file, multiplier * ((row_index + i-1) * width + column_index), MPI_SEEK_SET);
-        MPI_File_read(picture_file, source_vec + multiplier * (columns + 2) * i + multiplier, multiplier * columns, MPI_BYTE, &status);
+        /*
+         * Each process reads the corresponding block of data from the file, and stores it
+         * to the appropriate index
+         */
+
+        for (i = 1; i <= rows; i++) {
+            MPI_File_seek(picture_file, multiplier * ((row_index + i-1) * width + column_index), MPI_SEEK_SET);
+            MPI_File_read(picture_file, source_vec + multiplier * (columns + 2) * i + multiplier, multiplier * columns, MPI_BYTE, &status);
+        }
+        MPI_File_close(&picture_file);
     }
 
-    MPI_File_close(&picture_file);
 
     // Create columns for each process
     int columns_number_based_on_type, rows_number_based_on_type, blocklength;
@@ -376,10 +397,6 @@ int main(int argc, char **argv) {
 
     MPI_File_close(&picture_file_out);
 
-    free(source_vec);
-    free(destination_vec);
-    free(outputImage);
-    free(picture);
     if (comm_rk == MASTER_PROCESS) {
       printf("Elapsed time = %3.2lf seconds", end_time - start_time);
       if (!convergence_at_loop) {
@@ -389,6 +406,10 @@ int main(int argc, char **argv) {
       }
       printf("Blurred image file: %s\n", outputImage);
     }
+    free(source_vec);
+    free(destination_vec);
+    free(outputImage);
+    free(picture);
     MPI_Finalize();
     return 0;
 }
