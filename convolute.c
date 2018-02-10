@@ -266,6 +266,10 @@ int main(int argc, char **argv) {
     MPI_Type_vector(1, blocklength, 1, MPI_BYTE, &send_corner);
     MPI_Type_commit(&send_corner);
 
+    MPI_Barrier(cartesianComm);
+
+    double start_time = MPI_Wtime();
+
     for (i = 0; i < loops; i++) {
         // Calculate what each process should send
         // Datatypes calculation
@@ -342,6 +346,10 @@ int main(int argc, char **argv) {
         source_vec = destination_vec;
         destination_vec = temp_vec;
     }
+
+    MPI_Barrier(cartesianComm);
+    double end_time = MPI_Wtime();
+    printf("Total time = %3.2lf\n", end_time - start_time);
 
     char *outputImage = calloc(strlen("out_image.raw") + 1, sizeof(char));
     strncpy(outputImage, "out_image.raw", strlen("out_image.raw"));
