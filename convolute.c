@@ -14,15 +14,6 @@
 
 void convolute(unsigned char *src, unsigned char *dst, int start_row, int start_column, int end_row, int end_column, float h[3][3], int multiplier, int height);
 
-/*
- * 1. Find process row and column offsets and vector definition for the input data
- * 2. Convolution filter definition
- * 3. Parallel read of the input file "image"
- *
- */
-
-
-
 unsigned int best_fit(int rows, int cols, int processes) {
     unsigned int rows_it, cols_it, best_fit_val = 0, min = rows + cols + 1;
     unsigned int current;
@@ -100,11 +91,9 @@ int main(int argc, char **argv) {
     int loops = 0, grey = 0;
     char *picture = NULL;
     int rows = 0, columns = 0;
-    int proc_row = -1, proc_col = -1;
     int i = 0;
     int north, south, east, west;
     int north_west, north_east, south_west, south_east;
-    unsigned char* se_north_pos, se_south_pos, se_east_pos, se_west_pos, rcv_north_pos, rcv_south_pos, rcv_east_pos, rcv_west_pos;
 
     MPI_Init(&argc, &argv);
 
@@ -169,26 +158,21 @@ int main(int argc, char **argv) {
     se_coords[0] = coords[0] + 1; se_coords[1] = coords[1] + 1;
     if(MPI_Cart_rank(cartesianComm, se_coords, &south_east))
         south_east = MPI_PROC_NULL;
-    // printf("Comm rank: %d, NW: %d, NE: %d, SW: %d, SE: %d \n", comm_rk, north_west, north_east, south_west, south_east);
     // Variables setup
     int best_fit_rows;
     if (comm_rk == MASTER_PROCESS) {
         width = atoi(argv[1]); height = atoi(argv[2]);
         loops = atoi(argv[3]);
-        // printf("MASTER SAYS %d\n", height);
         if (!strcmp(argv[4], "grey"))
             grey = 1;
 
-        // printf("I am the master process\n");
         best_fit_rows = best_fit(height, width, comm_sz);
         if (!best_fit_rows) {
             MPI_Abort(cartesianComm, 1);
             return 1;
         }
-        // printf("%d\n", best_fit_rows);
         rows = height / best_fit_rows;
         columns = width / (comm_sz / best_fit_rows);
-        // printf("%d %d\n", rows, columns);
     }
 
 
@@ -209,22 +193,16 @@ int main(int argc, char **argv) {
     int row_index = (comm_rk / (comm_sz / best_fit_rows))* rows;
     int column_index = (comm_rk % (comm_sz / best_fit_rows)) * columns;
 
-    printf("%d, %d, \n", row_index, column_index);
-
     //swapping between source and destination vectors, using a temp vector
     unsigned char *source_vec = NULL, *destination_vec = NULL, *temp_vec = NULL;
 
     //multiplier shall be 3 for RGB input pictures, 1 for GREY input pictures
     unsigned int multiplier = (grey == 1) ? 1 : 3;
 
-    int total_sz = width * height * multiplier;
-
     source_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(unsigned char));
     destination_vec = calloc((rows + 2) * (columns + 2) * multiplier, sizeof(unsigned char));
 
     assert(source_vec != NULL && destination_vec != NULL);
-
-    printf("I am the process %d %d, %d, %d, %d, %s with starting row index = %d and starting column index = %d\n", comm_rk, width, height, loops, grey, picture, row_index, column_index);
 
     //2. Convolution filter definition
     float filter[3][3] = {{1/16.0, 2/16.0, 1/16.0},
@@ -250,13 +228,10 @@ int main(int argc, char **argv) {
 
     MPI_File_close(&picture_file);
 
-    // printf("read file\n");
-
-
     // Create columns for each process
-    int columns_number_based_on_type, columns_contiguous, rows_number_based_on_type, blocklength;
+    int columns_number_based_on_type, rows_number_based_on_type, blocklength;
+    unsigned int convergence_at_loop = 0;
     columns_number_based_on_type = (columns + 2) * multiplier;
-    columns_contiguous = columns * multiplier;
     rows_number_based_on_type = columns * multiplier;
     blocklength = multiplier;
 
@@ -287,7 +262,6 @@ int main(int argc, char **argv) {
 
         // Corner Elements
         unsigned char* rcv_nw_pos = source_vec;
-        unsigned char* rcv_ne_pos = source_vec + rows * (columns + 2) * multiplier + multiplier;
         //North
         MPI_Isend(se_north_pos, 1, send_row, north, 0, cartesianComm, &se_north_request);
         MPI_Irecv(rcv_north_pos, 1, send_row, north, 0, cartesianComm, &rcv_north_request);
@@ -341,9 +315,9 @@ int main(int argc, char **argv) {
         int local_convergence = 1;
         if (t % CONVERGENCE_CHECK == 0) {
             int i, j;
-            for (i = 0; i < rows + 2; i++) 
+            for (i = 0; i < rows + 2; i++)
                 for (j = 0; j < columns + 2; j++)
-                    if (destination_vec[multiplier * i * (columns + 2) + j * multiplier] & source_vec[multiplier * i * (columns + 2) + j * multiplier] == 0)
+                    if ((destination_vec[multiplier * i * (columns + 2) + j * multiplier] & source_vec[multiplier * i * (columns + 2) + j * multiplier]) == 0)
                         local_convergence = 0;
             MPI_Allreduce(&local_convergence, &total_convergence, 1, MPI_INT, MPI_LAND, cartesianComm);
         }
@@ -362,22 +336,17 @@ int main(int argc, char **argv) {
         source_vec = destination_vec;
         destination_vec = temp_vec;
 
-        if (total_convergence > 0)
-            printf("Convergence occured at loop %d\n", t);
-        else {
-            total_convergence = 0;
-            printf("No convergence\n");
+        if (total_convergence > 0) {
+          convergence_at_loop = t;
         }
     }
 
     MPI_Barrier(cartesianComm);
     double end_time = MPI_Wtime();
-    printf("Total time = %3.2lf\n", end_time - start_time);
 
     char *outputImage = calloc(strlen("out_image.raw") + 1, sizeof(char));
     strncpy(outputImage, "out_image.raw", strlen("out_image.raw"));
 
-    printf("%s\n", outputImage);
     MPI_File picture_file_out = NULL;
     MPI_File_open(cartesianComm, outputImage, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &picture_file_out);
 
@@ -397,7 +366,15 @@ int main(int argc, char **argv) {
     free(destination_vec);
     free(outputImage);
     free(picture);
-
+    if (comm_rk == MASTER_PROCESS) {
+      printf("Elapsed time = %3.2lf seconds", end_time - start_time);
+      if (!convergence_at_loop) {
+        printf(" (no convergence)\n");
+      } else {
+        printf(" with convergence at loop %d\n", convergence_at_loop);
+      }
+      printf("Blurred image file: %s\n", outputImage);
+    }
     MPI_Finalize();
     return 0;
 }
