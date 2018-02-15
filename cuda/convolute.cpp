@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, int loops);
+
 int main(int argc, char **argv) {
 
     unsigned char *vector = NULL;
@@ -22,7 +24,7 @@ int main(int argc, char **argv) {
     loops = atoi(argv[3]);
     if (!strcmp(argv[4], "grey")) multiplier = 1;
     else multiplier = 3;
-    input_picture = calloc(strlen(argv[5]) + 1, sizeof(char));
+    input_picture = (char *)calloc(strlen(argv[5]) + 1, sizeof(char));
     assert(input_picture != NULL);
     strncpy(input_picture, argv[5], strlen(argv[5]));
 
@@ -34,9 +36,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    vector = calloc(width * height * multiplier, sizeof(unsigned char));
+    printf("%s\n", input_picture);
+    vector = (unsigned char *)calloc(width * height * multiplier, sizeof(unsigned char));
     assert(vector != NULL);
-
 
     if (random < 0) {
         int read_b = 0;
@@ -51,10 +53,10 @@ int main(int argc, char **argv) {
     close(desc);
 
     // Convolution calculation
-    
-//    convolute();
 
-    output_picture = calloc(strlen("out_image.raw") + 1, sizeof(char));
+    convolute(vector, width, height, multiplier, loops);
+
+    output_picture = (char *)calloc(strlen("out_image.raw") + 1, sizeof(char));
     assert(output_picture != NULL);
     strncpy(output_picture, "out_image.raw", strlen("out_image.raw"));
 
