@@ -63,6 +63,64 @@ __global__ void convoluteBlock(unsigned char *src, unsigned char *dst, int x, in
     }
 }
 
+__global__ void convergence(unsigned char *src, unsigned char *dst, int x, int y, char *convbool, int multiplier) {
+    int x_dim = blockIdx.x * blockDim.x + threadIdx.x;
+    int y_dim = blockIdx.y * blockDim.y + threadIdx.y;
+
+    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+
+    /*Use of shared memory for the convergence check of the current thread's block*/
+    __shared__ char blockconvalues[BLOCK_SIZE][BLOCK_SIZE];
+
+    if (0 < x_dim && x_dim < y - 1 && 0 < y_dim && y_dim < y - 1) {
+
+        if (multiplier == 1) {
+            if (dst[x_dim * x + y_dim] == src[x_dim * x + y_dim])
+                blockconvalues[threadIdx.x][threadIdx.y] = 1;
+            else
+                blockconvalues[threadIdx.x][threadIdx.y] = 0;
+        } else {
+
+            if (dst[x_dim * x * multiplier + y_dim * multiplier] == src[x_dim * x + y_dim * multiplier] && 
+                dst[x_dim * x * multiplier + y_dim * multiplier + 1] == src[x_dim * x + y_dim * multiplier + 1] &&
+                dst[x_dim * x * multiplier + y_dim * multiplier + 2] == src[x_dim * x + y_dim * multiplier + 2] )
+                blockconvalues[threadIdx.x][threadIdx.y] = 1;
+            else
+                blockconvalues[threadIdx.x][threadIdx.y] = 0;
+        }
+        __syncthreads();
+
+        /*First thread of the block, checks if every thread of the block converges*/
+        if (threadIdx.x == 0 && threadIdx.y == 0) {
+
+            int blockconv = 1;
+            for (int i = 0; i < BLOCK_SIZE; i++) {
+                for (int j = 0; j < BLOCK_SIZE; j++) {
+                    if (blockconvalues[i][j] != 1) {
+                        blockconv = 0;
+                        break;
+
+                    }
+
+                }
+                if (blockconv == 0)
+                    break;
+
+            }
+
+            if (blockconv == 1)
+                convbool[blockId] = 1;
+            else
+                convbool[blockId] = 0;
+
+
+        }
+
+
+    }
+
+}
+
 extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, int loops) {
     unsigned char *vector_a, *vector_b, *temp;
 
@@ -83,8 +141,8 @@ extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, i
     cudaMemset(vector_b, 0, x * y * multiplier * sizeof(unsigned char));
     printf("%d %d\n", FRACTION_CEILING(x * multiplier, BLOCK_SIZE), FRACTION_CEILING(y, BLOCK_SIZE));
 
-//    int blocksperlinex = (int)ceil((double)(x * multiplier / BLOCK_SIZE));
-//    int blocksperliney = (int)ceil((double)(y / BLOCK_SIZE));
+    //    int blocksperlinex = (int)ceil((double)(x * multiplier / BLOCK_SIZE));
+    //    int blocksperliney = (int)ceil((double)(y / BLOCK_SIZE));
 
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 dimGrid(FRACTION_CEILING(y, BLOCK_SIZE), FRACTION_CEILING(x * multiplier, BLOCK_SIZE));
