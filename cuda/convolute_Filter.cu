@@ -4,6 +4,7 @@
 #include <time.h>
 
 #define BLOCK_SIZE 16
+#define CONVERGENCE_CHECK 5
 
 #define FRACTION_CEILING(numerator, denominator) ((numerator+denominator-1)/denominator)
 
@@ -63,7 +64,7 @@ __global__ void convoluteBlock(unsigned char *src, unsigned char *dst, int x, in
     }
 }
 
-__global__ void convergence(unsigned char *src, unsigned char *dst, int x, int y, char *convbool, int multiplier) {
+__global__ void convergence_grey(unsigned char *src, unsigned char *dst, int x, int y, char *convbool, int multiplier) {
     int x_dim = blockIdx.x * blockDim.x + threadIdx.x;
     int y_dim = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -79,14 +80,6 @@ __global__ void convergence(unsigned char *src, unsigned char *dst, int x, int y
                 blockconvalues[threadIdx.x][threadIdx.y] = 1;
             else
                 blockconvalues[threadIdx.x][threadIdx.y] = 0;
-        } else {
-
-            if (dst[x_dim * x * multiplier + y_dim * multiplier] == src[x_dim * x + y_dim * multiplier] && 
-                dst[x_dim * x * multiplier + y_dim * multiplier + 1] == src[x_dim * x + y_dim * multiplier + 1] &&
-                dst[x_dim * x * multiplier + y_dim * multiplier + 2] == src[x_dim * x + y_dim * multiplier + 2] )
-                blockconvalues[threadIdx.x][threadIdx.y] = 1;
-            else
-                blockconvalues[threadIdx.x][threadIdx.y] = 0;
         }
         __syncthreads();
 
@@ -97,6 +90,53 @@ __global__ void convergence(unsigned char *src, unsigned char *dst, int x, int y
             for (int i = 0; i < BLOCK_SIZE; i++) {
                 for (int j = 0; j < BLOCK_SIZE; j++) {
                     if (blockconvalues[i][j] != 1) {
+                        blockconv = 0;
+                        break;
+                    }
+                }
+                if (blockconv == 0)
+                    break;
+            }
+
+            if (blockconv == 1)
+                convbool[blockId] = 1;
+            else
+                convbool[blockId] = 0;
+
+
+        }
+
+
+    }
+
+}
+
+__global__ void convergence_rgb(unsigned char *src, unsigned char *dst, int x, int y, char *convbool, int multiplier) {
+    int x_dim = blockIdx.x * blockDim.x + threadIdx.x;
+    int y_dim = blockIdx.y * blockDim.y + threadIdx.y;
+
+    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+
+    /*Use of shared memory for the convergence check of the current thread's block*/
+    __shared__ char blockconvalues[BLOCK_SIZE][BLOCK_SIZE * 3];
+
+    if (0 < x_dim && x_dim < y - 1 && 0 < y_dim && y_dim < y - 1) {
+
+        if (dst[x_dim * x * multiplier + y_dim * multiplier] == src[x_dim * x + y_dim * multiplier])
+            blockconvalues[threadIdx.x][threadIdx.y] = 1;
+
+        else
+            blockconvalues[threadIdx.x][threadIdx.y] = 0; 
+
+        __syncthreads();
+
+        /*First thread of the block, checks if every thread of the block converges*/
+        if (threadIdx.x == 0 && threadIdx.y == 0) {
+
+            int blockconv = 1;
+            for (int i = 0; i < BLOCK_SIZE; i++) {
+                for (int j = 0; j < BLOCK_SIZE * 3; j += 3) {
+                    if (blockconvalues[i][j] != 1 || blockconvalues[i][j+1] != 1 || blockconvalues[i][j+2] != 1) {
                         blockconv = 0;
                         break;
 
@@ -115,14 +155,12 @@ __global__ void convergence(unsigned char *src, unsigned char *dst, int x, int y
 
 
         }
-
-
     }
-
 }
 
 extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, int loops) {
     unsigned char *vector_a, *vector_b, *temp;
+    char *convbool, *convboolhost;
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -131,11 +169,16 @@ extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, i
     // Initialize arrays
     printf("%d %d %d\n", x, y, x * y);
 
+    convboolhost = (char *)calloc((x * y) / BLOCK_SIZE, sizeof(char));
+    assert(convboolhost != NULL);
+
     cudaMalloc(&vector_a, x * y * multiplier * sizeof(unsigned char));
     cudaMalloc(&vector_b, x * y * multiplier * sizeof(unsigned char));
     assert(vector_a != NULL);
     assert(vector_b != NULL);
 
+    cudaMalloc(&convbool, sizeof(char) * ((x * y) / BLOCK_SIZE));
+    assert(convbool != NULL);
 
     cudaMemcpy(vector_a, vector, x * y * multiplier * sizeof(unsigned char), cudaMemcpyHostToDevice);
     cudaMemset(vector_b, 0, x * y * multiplier * sizeof(unsigned char));
@@ -152,6 +195,7 @@ extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, i
     int i = 0;
 
     printf("%d\n", loops);
+    int totalconv = 0;
     for (i = 0; i < loops; i++) {
         if (i > 0) {
             temp = vector_a;
@@ -159,6 +203,26 @@ extern "C" void convolute(unsigned char *vector, int x, int y, int multiplier, i
             vector_b = temp;
         }
         convoluteBlock<<<dimGrid, dimBlock>>>(vector_a, vector_b, x, y, multiplier);
+
+        if (i % CONVERGENCE_CHECK == 0) {
+
+            for (int j = 0; j < (x * y) / BLOCK_SIZE; j++)
+                convboolhost[i] = 0;
+
+            cudaMemcpy(convbool, convboolhost, sizeof(char) * ((x * y) / BLOCK_SIZE), cudaMemcpyHostToDevice);
+            convergence_grey<<<dimGrid, dimBlock>>>(vector_a, vector_b, x, y, convbool, multiplier);
+            cudaMemcpy(convboolhost, convbool, sizeof(char) * ((x * y) / BLOCK_SIZE), cudaMemcpyDeviceToHost);
+
+            for (int j = 0; j < (x * y) / BLOCK_SIZE; j++) {
+                if (convboolhost[i] != 0)
+                    totalconv = 1;
+                else
+                    totalconv = 0;
+            }
+        }
+
+        if (totalconv == 1)
+            printf("Convergence at %d\n", i);
 
     }
     cudaThreadSynchronize();
