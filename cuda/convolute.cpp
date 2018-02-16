@@ -17,30 +17,49 @@ int main(int argc, char **argv) {
     if (argc < 6) {
         printf("Not enough arguments\n");
         return 1;
-    } else if (argc == 7) random = 1;
+    }
 
     width = atoi(argv[1]);
     height = atoi(argv[2]);
     loops = atoi(argv[3]);
     if (!strcmp(argv[4], "grey")) multiplier = 1;
     else multiplier = 3;
+
+
     input_picture = (char *)calloc(strlen(argv[5]) + 1, sizeof(char));
     assert(input_picture != NULL);
     strncpy(input_picture, argv[5], strlen(argv[5]));
 
-
-    int desc = -1;
-
-    if ((desc = open(input_picture, O_RDONLY)) < 0) {
-        fprintf(stderr, "cannot open input picture file\n");
-        return 1;
-    }
-
-    printf("%s\n", input_picture);
     vector = (unsigned char *)calloc(width * height * multiplier, sizeof(unsigned char));
     assert(vector != NULL);
 
-    if (random < 0) {
+    int desc = -1;
+    if (!strcmp(input_picture, "random")) {
+        if (multiplier == 1) {
+
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    vector[i * width + j] = rand() % 254;
+                }
+            }
+
+        } else {
+
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    vector[i * multiplier * width + j * multiplier] = rand() % 254;
+                    vector[i * multiplier * width + j * multiplier + 1] = rand() % 254;
+                    vector[i * multiplier * width + j * multiplier + 2] = rand() % 254;
+                }
+            }
+        }
+    } else {
+
+        if ((desc = open(input_picture, O_RDONLY)) < 0) {
+            fprintf(stderr, "cannot open input picture file\n");
+            return 1;
+        }
+
         int read_b = 0;
         for (long i = 0; i < width * height * multiplier; i+= read_b) {
             if ((read_b = read(desc, vector + i, width * height * multiplier - i)) < 0) {
@@ -48,9 +67,10 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+
+        close(desc);
     }
 
-    close(desc);
 
     // Convolution calculation
 
