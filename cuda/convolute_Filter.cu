@@ -122,7 +122,7 @@ __global__ void convergence_rgb(unsigned char *src, unsigned char *dst, int x, i
 
     if (0 < x_dim && x_dim < y - 1 && 0 < y_dim && y_dim < y - 1) {
 
-        if (dst[x_dim * x * multiplier + y_dim * multiplier] == src[x_dim * x + y_dim * multiplier])
+        if (dst[x_dim * x * multiplier + y_dim * multiplier] == src[x_dim * x * multiplier + y_dim * multiplier])
             blockconvalues[threadIdx.x][threadIdx.y] = 1;
 
         else
